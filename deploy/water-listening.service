@@ -1,0 +1,19 @@
+[Unit]
+Description=Water, Listening (static site, port 8790)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/water-listening
+ExecStart=/usr/bin/python3 -m http.server 8790 --bind 127.0.0.1 --directory /home/ubuntu/water-listening
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
