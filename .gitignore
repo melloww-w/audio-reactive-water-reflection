@@ -1,4 +1,9 @@
 .DS_Store
 Thumbs.db
 *.log
-
+node_modules/
+.next/
+.vinext/
+.wrangler/
+dist/
+public/
