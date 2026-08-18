@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#111311" />
+    <meta
+      name="description"
+      content="An audio-reactive water reflection made with p5.js, WebGL, and the Web Audio API."
+    />
+    <title>Water, Listening</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main id="artwork" aria-label="Audio-reactive water reflection"></main>
+
+    <div class="status" id="status" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="status-text">Still water</span>
+    </div>
+
+    <aside class="panel" id="controls" aria-label="Water reflection controls">
+      <button class="panel-heading" id="panel-toggle" type="button" aria-expanded="true">
+        <span>
+          <span class="eyebrow">WATER / LISTENING</span>
+          <span class="panel-title">Audio reflection</span>
+        </span>
+        <span class="chevron" aria-hidden="true">⌃</span>
+      </button>
+
+      <div class="panel-body" id="panel-body">
+        <div class="signal" aria-label="Live microphone frequency levels">
+          <div class="signal-band">
+            <span>Bass</span>
+            <span class="signal-track"><span id="bass-meter"></span></span>
+          </div>
+          <div class="signal-band">
+            <span>Mids</span>
+            <span class="signal-track"><span id="mid-meter"></span></span>
+          </div>
+          <div class="signal-band">
+            <span>Highs</span>
+            <span class="signal-track"><span id="high-meter"></span></span>
+          </div>
+        </div>
+
+        <div class="sliders">
+          <label class="control-row" for="sensitivity">
+            <span>Microphone sensitivity</span><output data-value-for="sensitivity"></output>
+            <input id="sensitivity" data-param="sensitivity" type="range" min="0.35" max="3" step="0.01" />
+          </label>
+
+          <label class="control-row" for="ambient">
+            <span>Ambient motion</span><output data-value-for="ambient"></output>
+            <input id="ambient" data-param="ambient" type="range" min="0" max="1.5" step="0.01" />
+          </label>
+
+          <label class="control-row" for="distortion">
+            <span>Reflection distortion</span><output data-value-for="distortion"></output>
+            <input id="distortion" data-param="distortion" type="range" min="0.15" max="2" step="0.01" />
+          </label>
+
+          <label class="control-row" for="shimmer">
+            <span>Highlight shimmer</span><output data-value-for="shimmer"></output>
+            <input id="shimmer" data-param="shimmer" type="range" min="0" max="2" step="0.01" />
+          </label>
+
+          <label class="control-row" for="bloom">
+            <span>Bloom</span><output data-value-for="bloom"></output>
+            <input id="bloom" data-param="bloom" type="range" min="0" max="2" step="0.01" />
+          </label>
+
+          <label class="control-row" for="dispersion">
+            <span>Optical dispersion</span><output data-value-for="dispersion"></output>
+            <input id="dispersion" data-param="dispersion" type="range" min="0" max="2" step="0.01" />
+          </label>
+        </div>
+
+        <p class="audio-hint">
+          Play music near the microphone. The water follows the music immediately; reflected
+          light follows the water, while foreground leaves answer more slowly. Audio stays on this device.
+        </p>
+
+        <div class="button-grid">
+          <button class="action primary" id="microphone-button" type="button">Enable Microphone</button>
+          <button class="action" id="reset-button" type="button">Reset</button>
+          <button class="action" id="hide-button" type="button">Hide Controls</button>
+          <button class="action" id="fullscreen-button" type="button">Fullscreen</button>
+        </div>
+      </div>
+    </aside>
+
+    <button class="show-controls" id="show-controls" type="button" hidden>Show Controls</button>
+
+    <noscript>This artwork requires JavaScript.</noscript>
+
+    <script src="https://cdn.jsdelivr.net/npm/p5@2.3.1/lib/p5.min.js"></script>
+    <script src="sketch.js?v=2.2.0"></script>
+  </body>
+</html>
