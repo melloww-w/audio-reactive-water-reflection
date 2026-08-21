@@ -31,6 +31,10 @@ let frequencyData = null;
 let waveformData = null;
 let previousSpectrum = null;
 let microphoneActive = false;
+let trackElement = null;
+let trackSource = null;
+let trackObjectUrl = null;
+let trackActive = false;
 let lastOnsetTime = 0;
 let fluxAverage = 0.01;
 let previousRawBass = 0;
@@ -145,11 +149,19 @@ function bindInterface() {
       params[key] = Number(input.value);
       updateSliderReadout(input);
     });
+    bindSliderTouch(input);
   });
 
   const panel = document.querySelector("#controls");
   const panelToggle = document.querySelector("#panel-toggle");
   const showButton = document.querySelector("#show-controls");
+
+  // On phones the expanded panel covers most of the artwork, so it starts
+  // collapsed and opens only when asked.
+  if (window.matchMedia("(max-width: 560px)").matches) {
+    panel.classList.add("is-collapsed");
+    panelToggle.setAttribute("aria-expanded", "false");
+  }
 
   panelToggle.addEventListener("click", () => {
     const collapsed = panel.classList.toggle("is-collapsed");
@@ -167,10 +179,46 @@ function bindInterface() {
   });
 
   document.querySelector("#microphone-button").addEventListener("click", toggleMicrophone);
+  document.querySelector("#track-button").addEventListener("click", toggleTrack);
+  document.querySelector("#track-input").addEventListener("change", handleTrackSelection);
   document.querySelector("#reset-button").addEventListener("click", resetArtwork);
   document.querySelector("#fullscreen-button").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", updateFullscreenLabel);
   document.addEventListener("visibilitychange", handleVisibilityChange);
+}
+
+// On touch screens the native range input only responds to a precise grab of
+// its small thumb. This makes the whole track a touch surface: the thumb jumps
+// to the finger on touch and follows it while dragging.
+function bindSliderTouch(input) {
+  const setFromPointer = (event) => {
+    const bounds = input.getBoundingClientRect();
+    if (bounds.width <= 0) return;
+
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const step = Number(input.step) || 0.01;
+    const ratio = clamp01((event.clientX - bounds.left) / bounds.width);
+    const value = Math.round((min + ratio * (max - min)) / step) * step;
+
+    if (input.value !== String(value)) {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  };
+
+  input.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") return;
+    event.preventDefault();
+    input.setPointerCapture?.(event.pointerId);
+    input.focus({ preventScroll: true });
+    setFromPointer(event);
+  });
+
+  input.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "mouse") return;
+    if (input.hasPointerCapture?.(event.pointerId)) setFromPointer(event);
+  });
 }
 
 function updateSliderReadout(input) {
@@ -198,6 +246,8 @@ async function toggleMicrophone() {
   setStatus("Waiting for microphone permission");
 
   try {
+    await stopTrack(false);
+
     const supported = navigator.mediaDevices.getSupportedConstraints?.() || {};
     const audioConstraints = {};
     if (supported.echoCancellation) audioConstraints.echoCancellation = false;
@@ -216,18 +266,11 @@ async function toggleMicrophone() {
     audioContext = new AudioContextClass({ latencyHint: "interactive" });
     await audioContext.resume();
 
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.minDecibels = -92;
-    analyser.maxDecibels = -18;
-    analyser.smoothingTimeConstant = 0;
+    setUpAnalysis(audioContext);
 
     microphoneSource = audioContext.createMediaStreamSource(microphoneStream);
     microphoneSource.connect(analyser);
 
-    frequencyData = new Uint8Array(analyser.frequencyBinCount);
-    waveformData = new Uint8Array(analyser.fftSize);
-    previousSpectrum = new Uint8Array(analyser.frequencyBinCount);
     microphoneActive = true;
     lastSoundTime = 0;
     soundStatus = "waiting";
@@ -246,6 +289,100 @@ async function toggleMicrophone() {
     button.disabled = false;
     if (!microphoneActive) button.textContent = "Enable Microphone";
   }
+}
+
+function setUpAnalysis(context) {
+  analyser = context.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.minDecibels = -92;
+  analyser.maxDecibels = -18;
+  analyser.smoothingTimeConstant = 0;
+
+  frequencyData = new Uint8Array(analyser.frequencyBinCount);
+  waveformData = new Uint8Array(analyser.fftSize);
+  previousSpectrum = new Uint8Array(analyser.frequencyBinCount);
+}
+
+// Playing a local audio file through the page is the reliable way to react to
+// music on the same phone: sites cannot read other apps' audio, and enabling
+// the microphone tends to pause their playback anyway.
+function toggleTrack() {
+  if (trackActive) {
+    stopTrack();
+    return;
+  }
+  document.querySelector("#track-input").click();
+}
+
+async function handleTrackSelection(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+
+  try {
+    if (microphoneActive) await stopMicrophone(false);
+    await stopTrack(false);
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error("Web Audio API is unavailable");
+
+    audioContext = new AudioContextClass({ latencyHint: "interactive" });
+    await audioContext.resume();
+    setUpAnalysis(audioContext);
+
+    trackObjectUrl = URL.createObjectURL(file);
+    trackElement = new Audio(trackObjectUrl);
+    trackSource = audioContext.createMediaElementSource(trackElement);
+    trackSource.connect(analyser);
+    analyser.connect(audioContext.destination);
+    trackElement.addEventListener("ended", () => stopTrack());
+
+    await trackElement.play();
+
+    trackActive = true;
+    lastSoundTime = 0;
+    soundStatus = "waiting";
+    document.querySelector("#track-button").textContent = "Stop Track";
+    setStatus(`Playing · ${file.name}`, "live");
+  } catch (error) {
+    console.error("Unable to play the audio file:", error);
+    await stopTrack(false);
+    setStatus("Audio file could not be played", "error");
+  }
+}
+
+async function stopTrack(updateStatus = true) {
+  const wasActive = trackActive;
+
+  trackElement?.pause();
+  trackSource?.disconnect();
+  if (trackObjectUrl) URL.revokeObjectURL(trackObjectUrl);
+  trackElement = null;
+  trackSource = null;
+  trackObjectUrl = null;
+  trackActive = false;
+
+  if (wasActive) {
+    analyser?.disconnect();
+    const contextToClose = audioContext;
+    audioContext = null;
+    analyser = null;
+    frequencyData = null;
+    waveformData = null;
+    previousSpectrum = null;
+    soundStatus = "idle";
+
+    if (contextToClose && contextToClose.state !== "closed") {
+      try {
+        await contextToClose.close();
+      } catch (error) {
+        console.warn("Audio context did not close cleanly:", error);
+      }
+    }
+  }
+
+  document.querySelector("#track-button").textContent = "Play Audio File";
+  if (updateStatus && wasActive) setStatus("Still water");
 }
 
 async function stopMicrophone(updateStatus = true) {
@@ -280,7 +417,7 @@ function updateAudioFeatures(dt, now) {
   let targets = { volume: 0, bass: 0, mid: 0, high: 0 };
   let onsetTarget = 0;
 
-  if (microphoneActive && analyser && frequencyData && waveformData) {
+  if ((microphoneActive || trackActive) && analyser && frequencyData && waveformData) {
     analyser.getByteFrequencyData(frequencyData);
     analyser.getByteTimeDomainData(waveformData);
 
@@ -354,7 +491,7 @@ function updateAudioFeatures(dt, now) {
 }
 
 function updateMotionEnvelope(dt, now) {
-  const recentlyAudible = microphoneActive && now - lastSoundTime < 220;
+  const recentlyAudible = (microphoneActive || trackActive) && now - lastSoundTime < 220;
   const audioEnergy = clamp01(
     audioFeatures.volume * 0.52 +
     audioFeatures.bass * 0.20 +
@@ -526,7 +663,8 @@ function resetArtwork() {
   previousRawBass = 0;
   if (previousSpectrum) previousSpectrum.fill(0);
   updateSignalMeters();
-  setStatus(microphoneActive ? "Listening · play music" : "Still water", microphoneActive ? "live" : "");
+  const audioLive = microphoneActive || trackActive;
+  setStatus(audioLive ? "Listening · play music" : "Still water", audioLive ? "live" : "");
 }
 
 async function toggleFullscreen() {
@@ -547,15 +685,17 @@ function updateFullscreenLabel() {
 async function handleVisibilityChange() {
   if (document.hidden) {
     noLoop();
+    trackElement?.pause();
     if (audioContext?.state === "running") await audioContext.suspend();
     return;
   }
 
   previousFrameTime = performance.now();
   loop();
-  if (microphoneActive && audioContext?.state === "suspended") {
+  if ((microphoneActive || trackActive) && audioContext?.state === "suspended") {
     try {
       await audioContext.resume();
+      if (trackActive) await trackElement?.play();
     } catch (error) {
       console.warn("Audio context is waiting for another user gesture:", error);
     }

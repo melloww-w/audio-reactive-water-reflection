@@ -10,7 +10,7 @@
     />
     <title>Water, Listening</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=2.3.2" />
   </head>
   <body>
     <main id="artwork" aria-label="Audio-reactive water reflection"></main>
@@ -84,6 +84,7 @@
 
         <div class="button-grid">
           <button class="action primary" id="microphone-button" type="button">Enable Microphone</button>
+          <button class="action" id="track-button" type="button">Play Audio File</button>
           <button class="action" id="reset-button" type="button">Reset</button>
           <button class="action" id="hide-button" type="button">Hide Controls</button>
           <button class="action" id="fullscreen-button" type="button">Fullscreen</button>
@@ -92,10 +93,11 @@
     </aside>
 
     <button class="show-controls" id="show-controls" type="button" hidden>Show Controls</button>
+    <input id="track-input" type="file" accept="audio/*" hidden />
 
     <noscript>This artwork requires JavaScript.</noscript>
 
     <script src="https://cdn.jsdelivr.net/npm/p5@2.3.1/lib/p5.min.js"></script>
-    <script src="sketch.js?v=2.2.0"></script>
+    <script src="sketch.js?v=2.3.2"></script>
   </body>
 </html>
