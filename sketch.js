@@ -7,7 +7,7 @@
  */
 
 const DEFAULTS = Object.freeze({
-  sensitivity: 1.75,
+  sensitivity: 2.1,
   ambient: 0.58,
   distortion: 0.92,
   shimmer: 0.90,
@@ -504,9 +504,9 @@ function updateAudioFeatures(dt, now) {
 
     const rms = Math.sqrt(sumSquares / waveformData.length);
     if (microphoneActive) watchMicrophoneHealth(rms, dt);
-    const gate = smoothStep(0.003, 0.016, rms);
+    const gate = smoothStep(0.0018, 0.009, rms);
     const sensitivity = params.sensitivity;
-    const volume = clamp01((rms - 0.003) * 6.5 * sensitivity) * gate;
+    const volume = clamp01((rms - 0.0018) * 9 * sensitivity) * gate;
 
     const bassRaw = bandEnergy(35, 180);
     const midRaw = bandEnergy(180, 2200);
@@ -514,9 +514,9 @@ function updateAudioFeatures(dt, now) {
 
     targets = {
       volume,
-      bass: clamp01(Math.pow(bassRaw * sensitivity * 2.1, 1.12) * gate),
-      mid: clamp01(Math.pow(midRaw * sensitivity * 2.3, 1.16) * gate),
-      high: clamp01(Math.pow(highRaw * sensitivity * 2.9, 1.2) * gate),
+      bass: clamp01(Math.pow(bassRaw * sensitivity * 2.6, 1.08) * gate),
+      mid: clamp01(Math.pow(midRaw * sensitivity * 2.9, 1.1) * gate),
+      high: clamp01(Math.pow(highRaw * sensitivity * 3.6, 1.12) * gate),
     };
 
     let positiveFlux = 0;
@@ -541,7 +541,7 @@ function updateAudioFeatures(dt, now) {
 
     if (
       now - lastOnsetTime > 115 &&
-      targets.volume > 0.022 &&
+      targets.volume > 0.014 &&
       (flux > onsetThreshold || bassRise > 0.13)
     ) {
       onsetTarget = clamp01((flux - onsetThreshold) * 14 + bassRise * 2.4 + targets.bass * 0.18);
@@ -550,7 +550,7 @@ function updateAudioFeatures(dt, now) {
 
     previousRawBass = targets.bass;
 
-    if (targets.volume > 0.018) lastSoundTime = now;
+    if (targets.volume > 0.011) lastSoundTime = now;
     updateListeningStatus(now);
   }
 
@@ -574,7 +574,7 @@ function updateMotionEnvelope(dt, now) {
     audioFeatures.mid * 0.20 +
     audioFeatures.high * 0.08
   );
-  const target = recentlyAudible ? clamp01(0.16 + audioEnergy * 1.42) : 0;
+  const target = recentlyAudible ? clamp01(0.22 + audioEnergy * 1.7) : 0;
 
   // Fast response when music arrives; a short physical-looking coast when it
   // stops. Once the envelope is tiny it is snapped to zero so silence is truly
