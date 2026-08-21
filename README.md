@@ -4,27 +4,27 @@ An audio-reactive water-reflection artwork built from a frame of the source vide
 
 ## Video demo
 
-<a href="./demo-output/water-reflection-ripple-clean-audio-45s-ready.mp4">
+<a href="https://melloww-w.github.io/audio-reactive-water-reflection/video-demo.html">
   <img src="./assets/water-listening-demo.gif" alt="Animated preview of Water, Listening responding to music through moving water ripples, reflected highlights, and rainbow dispersion" width="100%" />
 </a>
 
 <p align="center">
-  <a href="./demo-output/water-reflection-ripple-clean-audio-45s-ready.mp4"><strong>Play the 45-second demo with sound →</strong></a>
+  <a href="https://melloww-w.github.io/audio-reactive-water-reflection/video-demo.html"><strong>Play the 45-second demo with sound and video controls →</strong></a>
 </p>
 
-The preview above plays automatically without sound. Open the full 1080p recording to hear the music and see how microphone sensitivity, water distortion, shimmer, bloom, and optical dispersion change the response.
+The preview above plays automatically without sound. Open the full 1080p recording to hear the music and see how microphone sensitivity, water distortion, shimmer, bloom, and optical dispersion change the response. A [direct MP4 download](./demo-output/water-reflection-ripple-clean-audio-45s-ready.mp4) is also available.
 
 ## Interactive demo
 
-<a href="https://hermes-oracle.taila8d535.ts.net/water/">
+<a href="https://melloww-w.github.io/audio-reactive-water-reflection/">
   <img src="./assets/demo-preview.jpg" alt="Water, Listening — an audio-reactive water reflection with leaves, flowing highlights, and subtle rainbow dispersion" width="100%" />
 </a>
 
 <p align="center">
-  <a href="https://hermes-oracle.taila8d535.ts.net/water/"><strong>Launch the interactive artwork →</strong></a>
+  <a href="https://melloww-w.github.io/audio-reactive-water-reflection/"><strong>Launch the interactive artwork →</strong></a>
 </p>
 
-The hosted demo is available inside the project's Tailscale network. Select **Enable Microphone**, play music near the device, and then pause the music to watch the water return to stillness. GitHub README files cannot run an iframe or microphone-enabled WebGL application directly, so the embedded preview above links to the live experience.
+The public demo is hosted with GitHub Pages over HTTPS, which allows the browser to request microphone access. Select **Enable Microphone**, play music near the device, and then pause the music to watch the water return to stillness. Audio analysis remains on your device.
 
 ## Interaction model
 
@@ -66,8 +66,8 @@ The water responds in sync with the music. Reflected light is a consequence of t
 | --- | --- | --- |
 | Development | Node.js, npm, Vite 8, and Vinext | Local development and deployable build generation |
 | Hosting wrapper | React 19 | Lightweight deployment entry point; the artwork itself remains vanilla JavaScript |
-| Hermes runtime | Python HTTP server and systemd | Persistent localhost-only static service |
-| Secure routing | Tailscale Serve | Tailnet-only HTTPS routing to the Hermes service |
+| Continuous deployment | GitHub Actions | Publishes every update from `main` automatically |
+| Public hosting | GitHub Pages | HTTPS hosting for microphone permission and the video player |
 
 MediaPipe, webcam input, and hand tracking are not used in this audio-focused version.
 
