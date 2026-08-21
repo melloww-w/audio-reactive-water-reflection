@@ -7,7 +7,7 @@
  */
 
 const DEFAULTS = Object.freeze({
-  sensitivity: 1.35,
+  sensitivity: 1.75,
   ambient: 0.58,
   distortion: 0.92,
   shimmer: 0.90,
@@ -35,6 +35,8 @@ let trackElement = null;
 let trackSource = null;
 let trackObjectUrl = null;
 let trackActive = false;
+let micSilenceSeconds = 0;
+let micRecoveryAttempts = 0;
 let lastOnsetTime = 0;
 let fluxAverage = 0.01;
 let previousRawBass = 0;
@@ -264,6 +266,7 @@ async function toggleMicrophone() {
     if (!AudioContextClass) throw new Error("Web Audio API is unavailable");
 
     audioContext = new AudioContextClass({ latencyHint: "interactive" });
+    audioContext.onstatechange = handleAudioContextStateChange;
     await audioContext.resume();
 
     setUpAnalysis(audioContext);
@@ -272,6 +275,8 @@ async function toggleMicrophone() {
     microphoneSource.connect(analyser);
 
     microphoneActive = true;
+    micSilenceSeconds = 0;
+    micRecoveryAttempts = 0;
     lastSoundTime = 0;
     soundStatus = "waiting";
 
@@ -288,6 +293,70 @@ async function toggleMicrophone() {
   } finally {
     button.disabled = false;
     if (!microphoneActive) button.textContent = "Enable Microphone";
+  }
+}
+
+// iOS Safari occasionally delivers a microphone stream that is digitally
+// silent — a known WebKit issue when audio contexts are recreated, e.g. after
+// in-page file playback. A live microphone always carries a noise floor, so a
+// stretch of perfect digital silence means the graph is dead. Rebuild it.
+function watchMicrophoneHealth(rms, dt) {
+  if (rms > 0.00001) {
+    micSilenceSeconds = 0;
+    micRecoveryAttempts = 0;
+    return;
+  }
+
+  micSilenceSeconds += dt;
+  if (micSilenceSeconds > 2.5 && micRecoveryAttempts < 2) {
+    micSilenceSeconds = 0;
+    micRecoveryAttempts += 1;
+    recoverMicrophone();
+  }
+}
+
+async function recoverMicrophone() {
+  if (!microphoneActive) return;
+  console.warn("Microphone stream looks silent; rebuilding the audio graph");
+
+  try {
+    microphoneSource?.disconnect();
+    analyser?.disconnect();
+    const staleContext = audioContext;
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContextClass({ latencyHint: "interactive" });
+    audioContext.onstatechange = handleAudioContextStateChange;
+    await audioContext.resume();
+    setUpAnalysis(audioContext);
+
+    const streamAlive = microphoneStream
+      ?.getAudioTracks()
+      .some((track) => track.readyState === "live");
+    if (!streamAlive) {
+      microphoneStream?.getTracks().forEach((track) => track.stop());
+      microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    }
+
+    microphoneSource = audioContext.createMediaStreamSource(microphoneStream);
+    microphoneSource.connect(analyser);
+
+    if (staleContext && staleContext.state !== "closed") {
+      staleContext.close().catch(() => {});
+    }
+  } catch (error) {
+    console.warn("Microphone recovery failed:", error);
+  }
+}
+
+// iOS suspends the audio context on interruptions (phone calls, Siri, app
+// switches). Resume as soon as the interruption ends, unless the page is
+// hidden — that suspension is deliberate.
+function handleAudioContextStateChange() {
+  if (document.hidden) return;
+  if (!(microphoneActive || trackActive)) return;
+  if (audioContext && audioContext.state !== "running") {
+    audioContext.resume().catch(() => {});
   }
 }
 
@@ -327,6 +396,7 @@ async function handleTrackSelection(event) {
     if (!AudioContextClass) throw new Error("Web Audio API is unavailable");
 
     audioContext = new AudioContextClass({ latencyHint: "interactive" });
+    audioContext.onstatechange = handleAudioContextStateChange;
     await audioContext.resume();
     setUpAnalysis(audioContext);
 
@@ -362,7 +432,10 @@ async function stopTrack(updateStatus = true) {
   trackObjectUrl = null;
   trackActive = false;
 
-  if (wasActive) {
+  // Release the audio graph even after a failed start, where trackActive was
+  // never set; a stale context left behind breaks the next microphone session
+  // on iOS. The microphone owns the context when it is active, so leave it.
+  if (!microphoneActive && audioContext) {
     analyser?.disconnect();
     const contextToClose = audioContext;
     audioContext = null;
@@ -395,6 +468,8 @@ async function stopMicrophone(updateStatus = true) {
   microphoneSource = null;
   analyser = null;
   audioContext = null;
+  micSilenceSeconds = 0;
+  micRecoveryAttempts = 0;
   frequencyData = null;
   waveformData = null;
   previousSpectrum = null;
@@ -428,9 +503,10 @@ function updateAudioFeatures(dt, now) {
     }
 
     const rms = Math.sqrt(sumSquares / waveformData.length);
-    const gate = smoothStep(0.006, 0.028, rms);
+    if (microphoneActive) watchMicrophoneHealth(rms, dt);
+    const gate = smoothStep(0.003, 0.016, rms);
     const sensitivity = params.sensitivity;
-    const volume = clamp01((rms - 0.005) * 4.8 * sensitivity) * gate;
+    const volume = clamp01((rms - 0.003) * 6.5 * sensitivity) * gate;
 
     const bassRaw = bandEnergy(35, 180);
     const midRaw = bandEnergy(180, 2200);
@@ -438,9 +514,9 @@ function updateAudioFeatures(dt, now) {
 
     targets = {
       volume,
-      bass: clamp01(Math.pow(bassRaw * sensitivity * 1.75, 1.12) * gate),
-      mid: clamp01(Math.pow(midRaw * sensitivity * 1.9, 1.16) * gate),
-      high: clamp01(Math.pow(highRaw * sensitivity * 2.45, 1.2) * gate),
+      bass: clamp01(Math.pow(bassRaw * sensitivity * 2.1, 1.12) * gate),
+      mid: clamp01(Math.pow(midRaw * sensitivity * 2.3, 1.16) * gate),
+      high: clamp01(Math.pow(highRaw * sensitivity * 2.9, 1.2) * gate),
     };
 
     let positiveFlux = 0;
@@ -465,7 +541,7 @@ function updateAudioFeatures(dt, now) {
 
     if (
       now - lastOnsetTime > 115 &&
-      targets.volume > 0.035 &&
+      targets.volume > 0.022 &&
       (flux > onsetThreshold || bassRise > 0.13)
     ) {
       onsetTarget = clamp01((flux - onsetThreshold) * 14 + bassRise * 2.4 + targets.bass * 0.18);
@@ -474,7 +550,7 @@ function updateAudioFeatures(dt, now) {
 
     previousRawBass = targets.bass;
 
-    if (targets.volume > 0.028) lastSoundTime = now;
+    if (targets.volume > 0.018) lastSoundTime = now;
     updateListeningStatus(now);
   }
 
