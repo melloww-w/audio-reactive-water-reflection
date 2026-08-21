@@ -37,6 +37,7 @@ let trackObjectUrl = null;
 let trackActive = false;
 let micSilenceSeconds = 0;
 let micRecoveryAttempts = 0;
+let micReleasedInBackground = false;
 let lastOnsetTime = 0;
 let fluxAverage = 0.01;
 let previousRawBass = 0;
@@ -249,6 +250,7 @@ async function toggleMicrophone() {
 
   try {
     await stopTrack(false);
+    setAudioSessionType("play-and-record");
 
     const supported = navigator.mediaDevices.getSupportedConstraints?.() || {};
     const audioConstraints = {};
@@ -360,6 +362,16 @@ function handleAudioContextStateChange() {
   }
 }
 
+// Tell Safari what kind of audio session the page needs so iOS only claims
+// the microphone route while capture is genuinely active. Ignored elsewhere.
+function setAudioSessionType(type) {
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = type;
+  } catch (error) {
+    // Older browsers without the Audio Session API.
+  }
+}
+
 function setUpAnalysis(context) {
   analyser = context.createAnalyser();
   analyser.fftSize = 2048;
@@ -391,6 +403,7 @@ async function handleTrackSelection(event) {
   try {
     if (microphoneActive) await stopMicrophone(false);
     await stopTrack(false);
+    setAudioSessionType("playback");
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) throw new Error("Web Audio API is unavailable");
@@ -454,6 +467,7 @@ async function stopTrack(updateStatus = true) {
     }
   }
 
+  if (!microphoneActive) setAudioSessionType("auto");
   document.querySelector("#track-button").textContent = "Play Audio File";
   if (updateStatus && wasActive) setStatus("Still water");
 }
@@ -484,6 +498,7 @@ async function stopMicrophone(updateStatus = true) {
     }
   }
 
+  setAudioSessionType("auto");
   document.querySelector("#microphone-button").textContent = "Enable Microphone";
   if (updateStatus) setStatus("Still water");
 }
@@ -762,16 +777,35 @@ async function handleVisibilityChange() {
   if (document.hidden) {
     noLoop();
     trackElement?.pause();
-    if (audioContext?.state === "running") await audioContext.suspend();
+
+    // Release the microphone completely while the page is in the background.
+    // Merely suspending it keeps the phone's "record" audio session claimed,
+    // and re-activating that session when the page returns forces iOS to
+    // pause whatever another app (e.g. Spotify) is playing.
+    if (microphoneActive) {
+      micReleasedInBackground = true;
+      await stopMicrophone(false);
+      setStatus("Microphone released · tap Enable Microphone");
+    } else if (audioContext?.state === "running") {
+      await audioContext.suspend();
+    }
     return;
   }
 
   previousFrameTime = performance.now();
   loop();
-  if ((microphoneActive || trackActive) && audioContext?.state === "suspended") {
+
+  // Deliberately no microphone auto-restart here: grabbing the mic again
+  // would immediately pause the user's music in other apps.
+  if (micReleasedInBackground) {
+    micReleasedInBackground = false;
+    setStatus("Microphone off while away · tap Enable Microphone");
+  }
+
+  if (trackActive && audioContext?.state === "suspended") {
     try {
       await audioContext.resume();
-      if (trackActive) await trackElement?.play();
+      await trackElement?.play();
     } catch (error) {
       console.warn("Audio context is waiting for another user gesture:", error);
     }
