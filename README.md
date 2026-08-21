@@ -1,16 +1,82 @@
 # Water, Listening
 
-An audio-reactive water-reflection artwork built from a frame of the source video. Music drives the water surface first; reflected light follows the changing water normals, while foreground leaves respond with a softer delay.
+An audio-reactive water-reflection artwork built from a frame of the source video. Music moves the water surface first; reflected light follows the changing water normals, while foreground leaves respond with a softer delay. When the input becomes silent, the entire scene settles into a completely still frame.
+
+## Interactive demo
+
+<a href="https://hermes-oracle.taila8d535.ts.net/water/">
+  <img src="./assets/demo-preview.jpg" alt="Water, Listening — an audio-reactive water reflection with leaves, flowing highlights, and subtle rainbow dispersion" width="100%" />
+</a>
+
+<p align="center">
+  <a href="https://hermes-oracle.taila8d535.ts.net/water/"><strong>Launch the interactive artwork →</strong></a>
+</p>
+
+The hosted demo is available inside the project's Tailscale network. Select **Enable Microphone**, play music near the device, and then pause the music to watch the water return to stillness. GitHub README files cannot run an iframe or microphone-enabled WebGL application directly, so the embedded preview above links to the live experience.
+
+## Interaction model
+
+```text
+Microphone input
+      ↓
+Web Audio frequency analysis
+      ↓
+Bass / mids / highs / volume
+      ↓
+Water displacement and flow
+      ↓
+Refraction, shimmer, bloom, and rainbow dispersion
+      ↓
+Delayed foreground-leaf response
+```
+
+The water responds in sync with the music. Reflected light is a consequence of the changing surface rather than an independent animation, and the leaves follow with a gentler, slightly delayed motion.
+
+## Technology stack
+
+### Artwork runtime
+
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Structure | HTML5 | Accessible controls and fullscreen artwork container |
+| Presentation | CSS3 | Responsive layout, control panel, and fullscreen composition |
+| Interaction | Vanilla JavaScript | Audio analysis, smoothing, animation state, and UI behavior |
+| Creative coding | p5.js 2.3.1 | WebGL canvas, lifecycle, and shader integration |
+| GPU rendering | WebGL | Real-time, hardware-accelerated image processing |
+| Visual simulation | GLSL vertex and fragment shaders | Water displacement, refraction, flowing highlights, bloom, and optical dispersion |
+| Audio analysis | Web Audio API | Volume and bass, mid, and high-frequency extraction |
+| Audio input | WebRTC `getUserMedia()` | Browser microphone permission and live audio stream |
+| Source material | PNG and JPEG | Water-reflection frame and supporting image textures |
+
+### Build and hosting
+
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Development | Node.js, npm, Vite 8, and Vinext | Local development and deployable build generation |
+| Hosting wrapper | React 19 | Lightweight deployment entry point; the artwork itself remains vanilla JavaScript |
+| Hermes runtime | Python HTTP server and systemd | Persistent localhost-only static service |
+| Secure routing | Tailscale Serve | Tailnet-only HTTPS routing to the Hermes service |
+
+MediaPipe, webcam input, and hand tracking are not used in this audio-focused version.
 
 ## Run locally
 
-Microphone access requires a secure browser context, such as `localhost` or HTTPS.
+Microphone access requires a secure browser context such as `localhost` or HTTPS.
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and select **Enable Microphone**.
+
+For the dependency-free static version, you can instead run:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Open [http://localhost:8000](http://localhost:8000), select **Enable Microphone**, and play music near the microphone. When the input becomes silent, the water, light traces, and leaves settle into a completely still frame.
+Then open [http://localhost:8000](http://localhost:8000).
 
 ## Controls
 
@@ -21,13 +87,6 @@ Open [http://localhost:8000](http://localhost:8000), select **Enable Microphone*
 - **Bloom** adjusts the softness around bright reflections.
 - **Optical dispersion** controls the subtle rainbow separation in sunlight.
 
-## Built with
+## Privacy
 
-- HTML and CSS
-- Vanilla JavaScript
-- p5.js 2.3.1
-- WebGL and GLSL fragment shaders
-- Web Audio API microphone analysis
-
-Audio is analyzed locally in the browser and is not recorded or uploaded.
-
+Audio is analyzed locally in the browser. It is not recorded or uploaded.
