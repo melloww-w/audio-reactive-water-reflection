@@ -2,6 +2,18 @@
 
 An audio-reactive water-reflection artwork built from a frame of the source video. Music moves the water surface first; reflected light follows the changing water normals, while foreground leaves respond with a softer delay. When the input becomes silent, the entire scene settles into a completely still frame.
 
+## Video demo
+
+<a href="./demo-output/water-reflection-ripple-clean-audio-45s-ready.mp4">
+  <img src="./assets/water-listening-demo.gif" alt="Animated preview of Water, Listening responding to music through moving water ripples, reflected highlights, and rainbow dispersion" width="100%" />
+</a>
+
+<p align="center">
+  <a href="./demo-output/water-reflection-ripple-clean-audio-45s-ready.mp4"><strong>Play the 45-second demo with sound →</strong></a>
+</p>
+
+The preview above plays automatically without sound. Open the full 1080p recording to hear the music and see how microphone sensitivity, water distortion, shimmer, bloom, and optical dispersion change the response.
+
 ## Interactive demo
 
 <a href="https://hermes-oracle.taila8d535.ts.net/water/">
